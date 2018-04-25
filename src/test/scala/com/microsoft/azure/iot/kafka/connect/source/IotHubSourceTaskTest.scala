@@ -32,8 +32,8 @@ class IotHubSourceTaskTest extends FlatSpec with GivenWhenThen with JsonSerializ
       val messageStruct = record.value().asInstanceOf[Struct]
       assert(messageStruct.getString("deviceId").startsWith("device"))
       assert(messageStruct.getString("contentType") == "temperature")
-      val enqueuedTime = Instant.parse(messageStruct.getString("enqueuedTime"))
-      assert(enqueuedTime.isAfter(Instant.parse("2016-11-20T00:00:00Z")))
+      val enqueuedTime = Instant.ofEpochSecond(messageStruct.getInt64("enqueuedTime"))
+      assert(enqueuedTime.compareTo(Instant.ofEpochSecond(Instant.parse("2016-11-20T00:00:00Z").getEpochSecond)) > 0)
 
       val systemProperties = messageStruct.getMap[String, String]("systemProperties")
       assert(systemProperties != null)

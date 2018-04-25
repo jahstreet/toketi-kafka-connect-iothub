@@ -13,6 +13,22 @@ import scala.reflect.ClassTag
 
 object IotMessageConverter {
 
+  // Public for testing purposes
+  lazy val schema: Schema = SchemaBuilder.struct()
+                            .name(schemaName)
+                            .version(schemaVersion)
+                            .field(deviceIdKey, Schema.STRING_SCHEMA)
+                            .field(offsetKey, Schema.STRING_SCHEMA)
+                            .field(contentTypeKey, Schema.OPTIONAL_STRING_SCHEMA)
+                            .field(enqueuedTimeKey, Schema.INT64_SCHEMA)
+                            .field(sequenceNumberKey, Schema.INT64_SCHEMA)
+                            .field(contentKey, Schema.STRING_SCHEMA)
+                            .field(systemPropertiesKey, propertiesMapSchema)
+                            .field(propertiesKey, propertiesMapSchema)
+
+  // TODO made optionals
+  private lazy val propertiesMapSchema: Schema = SchemaBuilder.map(Schema.OPTIONAL_STRING_SCHEMA, Schema.OPTIONAL_STRING_SCHEMA)
+
   val offsetKey = "offset"
 
   private val schemaName          = "iothub.kafka.connect"
@@ -26,32 +42,17 @@ object IotMessageConverter {
   private val propertiesKey       = "properties"
   private val deviceIdIotHubKey   = "iothub-connection-device-id"
 
-  // Public for testing purposes
-  lazy val schema: Schema = SchemaBuilder.struct()
-    .name(schemaName)
-    .version(schemaVersion)
-    .field(deviceIdKey, Schema.STRING_SCHEMA)
-    .field(offsetKey, Schema.STRING_SCHEMA)
-    .field(contentTypeKey, Schema.OPTIONAL_STRING_SCHEMA)
-    .field(enqueuedTimeKey, Schema.STRING_SCHEMA)
-    .field(sequenceNumberKey, Schema.INT64_SCHEMA)
-    .field(contentKey, Schema.STRING_SCHEMA)
-    .field(systemPropertiesKey, propertiesMapSchema)
-    .field(propertiesKey, propertiesMapSchema)
-
-  private lazy val propertiesMapSchema: Schema = SchemaBuilder.map(Schema.STRING_SCHEMA, Schema.STRING_SCHEMA)
-
   def getIotMessageStruct(iotMessage: IotMessage): Struct = {
 
     val systemProperties = iotMessage.systemProperties
-    val deviceId: String = getOrDefaultAndRemove(systemProperties, deviceIdIotHubKey, "")
-    val offset: String = getOrDefaultAndRemove(systemProperties, AmqpConstants.OFFSET_ANNOTATION_NAME, "")
-    val sequenceNumber: Long = getOrDefaultAndRemove(systemProperties, AmqpConstants.SEQUENCE_NUMBER_ANNOTATION_NAME, 0)
+    val deviceId: String = getOrDefault(systemProperties, deviceIdIotHubKey, "")
+    val offset: String = getOrDefault(systemProperties, AmqpConstants.OFFSET_ANNOTATION_NAME, "")
+    val sequenceNumber: Long = getOrDefault(systemProperties, AmqpConstants.SEQUENCE_NUMBER_ANNOTATION_NAME, 0)
     val enqueuedTime: Option[Instant] = getEnqueuedTime(systemProperties)
-    val enqueuedTimeStr = if(enqueuedTime.isDefined) enqueuedTime.get.toString else ""
+    val enqueuedTimeLong = if (enqueuedTime.isDefined) enqueuedTime.get.getEpochSecond else 0
 
     val properties = iotMessage.properties
-    val contentType: String = getOrDefaultAndRemove(properties, contentTypeKey, "")
+    val contentType: String = getOrDefault(properties, contentTypeKey, "")
 
     val systemPropertiesMap = systemProperties.map(i => (i._1, i._2.toString))
 
@@ -59,7 +60,7 @@ object IotMessageConverter {
       .put(deviceIdKey, deviceId)
       .put(offsetKey, offset)
       .put(contentTypeKey, contentType)
-      .put(enqueuedTimeKey, enqueuedTimeStr)
+      .put(enqueuedTimeKey, enqueuedTimeLong)
       .put(sequenceNumberKey, sequenceNumber)
       .put(contentKey, iotMessage.content)
       .put(systemPropertiesKey, systemPropertiesMap.asJava)
@@ -67,18 +68,32 @@ object IotMessageConverter {
   }
 
   private def getEnqueuedTime(map: scala.collection.mutable.Map[String, Object]): Option[Instant] = {
-    val enqueuedTimeValue: Date = getOrDefaultAndRemove(map, AmqpConstants.ENQUEUED_TIME_UTC_ANNOTATION_NAME, null)
+    val enqueuedTimeValue: Date = getOrDefault(map, AmqpConstants.ENQUEUED_TIME_UTC_ANNOTATION_NAME, null)
     if (enqueuedTimeValue != null) Some(enqueuedTimeValue.toInstant) else None
   }
 
   private def getOrDefaultAndRemove[T: ClassTag, S: ClassTag](map: scala.collection.mutable.Map[String, S],
-      key: String, defaultVal: T): T = {
+                                                              key: String, defaultVal: T): T =
+  {
 
     if (map.contains(key)) {
       val retVal: T = map(key).asInstanceOf[T]
       map.remove(key)
       retVal
-    } else {
+    } else
+    {
+      defaultVal
+    }
+  }
+
+  private def getOrDefault[T: ClassTag, S: ClassTag](map: scala.collection.mutable.Map[String, S],
+                                                     key: String, defaultVal: T): T =
+  {
+
+    if (map.contains(key)) {
+      map(key).asInstanceOf[T]
+    } else
+    {
       defaultVal
     }
   }

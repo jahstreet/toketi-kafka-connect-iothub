@@ -50,18 +50,18 @@ class IotMessageConverterTest extends FlatSpec with GivenWhenThen with JsonSeria
     assert(kafkaMessageStruct.getString("deviceId") == "device10")
     assert(kafkaMessageStruct.getString("offset") == offset)
     assert(kafkaMessageStruct.getString("contentType") == "temperature")
-    assert(kafkaMessageStruct.getString("enqueuedTime") == enqueuedDate.toInstant.toString)
+    assert(kafkaMessageStruct.getInt64("enqueuedTime") == enqueuedDate.toInstant.getEpochSecond)
     assert(kafkaMessageStruct.getInt64("sequenceNumber") == sequenceNumber)
     assert(kafkaMessageStruct.getString("content") == deviceTempStr)
 
     val structSystemProperties = kafkaMessageStruct.getMap[String, String]("systemProperties")
     assert(structSystemProperties != null)
-    assert(structSystemProperties.size == 1)
+    assert(structSystemProperties.size >= 1)
     assert(structSystemProperties.get(AmqpConstants.AMQP_PROPERTY_CORRELATION_ID) == correlationId)
 
     val structProperties = kafkaMessageStruct.getMap[String, String]("properties")
     assert(structProperties != null)
-    assert(structProperties.size == 1)
+    assert(structProperties.size >= 1)
     assert(structProperties.get("timestamp") == timestamp)
   }
 
@@ -82,7 +82,7 @@ class IotMessageConverterTest extends FlatSpec with GivenWhenThen with JsonSeria
     assert(kafkaMessageStruct.getString("deviceId") == "")
     assert(kafkaMessageStruct.getString("offset") == "")
     assert(kafkaMessageStruct.getString("contentType") == "")
-    assert(kafkaMessageStruct.getString("enqueuedTime") == "")
+    assert(kafkaMessageStruct.getInt64("enqueuedTime") == 0)
     assert(kafkaMessageStruct.getInt64("sequenceNumber") == 0)
     assert(kafkaMessageStruct.getString("content") == deviceTempStr)
 
