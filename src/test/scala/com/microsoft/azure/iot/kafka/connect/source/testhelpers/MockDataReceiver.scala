@@ -1,19 +1,20 @@
 // Copyright (c) Microsoft. All rights reserved.
 
-package com.microsoft.azure.iot.kafka.connect.testhelpers
+package com.microsoft.azure.iot.kafka.connect.source.testhelpers
 
 import java.text.SimpleDateFormat
 import java.time.{Duration, Instant}
 
-import com.microsoft.azure.iot.kafka.connect.{DataReceiver, IotMessage, JsonSerialization}
-import com.microsoft.azure.servicebus.amqp.AmqpConstants
+import com.microsoft.azure.eventhubs.impl.AmqpConstants
+import com.microsoft.azure.iot.kafka.connect.source.{DataReceiver, IotMessage, JsonSerialization}
 import org.json4s.jackson.Serialization.write
 
 import scala.collection.mutable
 import scala.util.Random
 
 class MockDataReceiver(val connectionString: String, val receiverConsumerGroup: String, val partition: String,
-    var offset: Option[String], val startTime: Option[Instant]) extends DataReceiver with JsonSerialization {
+    var offset: Option[String], val startTime: Option[Instant], val receiveTimeout: Duration
+    ) extends DataReceiver with JsonSerialization {
 
   private val random: Random = new Random
 
@@ -37,7 +38,7 @@ class MockDataReceiver(val connectionString: String, val receiverConsumerGroup: 
       AmqpConstants.OFFSET_ANNOTATION_NAME → random.nextString(10),
       AmqpConstants.ENQUEUED_TIME_UTC_ANNOTATION_NAME → new SimpleDateFormat("MM/dd/yyyy").parse("12/01/2016"))
 
-    val messageProperties = mutable.Map[String, String](
+    val messageProperties = mutable.Map[String, Object](
       "timestamp" → Instant.now().toString,
       "contentType" → "temperature"
     )

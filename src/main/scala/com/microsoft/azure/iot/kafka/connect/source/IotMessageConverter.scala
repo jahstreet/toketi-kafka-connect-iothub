@@ -1,11 +1,11 @@
 // Copyright (c) Microsoft. All rights reserved.
 
-package com.microsoft.azure.iot.kafka.connect
+package com.microsoft.azure.iot.kafka.connect.source
 
 import java.time.Instant
 import java.util.Date
 
-import com.microsoft.azure.servicebus.amqp.AmqpConstants
+import com.microsoft.azure.eventhubs.impl.AmqpConstants
 import org.apache.kafka.connect.data.{Schema, SchemaBuilder, Struct}
 
 import scala.collection.JavaConverters._
