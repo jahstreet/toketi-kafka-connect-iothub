@@ -7,6 +7,7 @@ import java.util
 
 import com.microsoft.azure.eventhubs.ConnectionStringBuilder
 import com.microsoft.azure.eventhubs.impl.ClientConstants
+import com.microsoft.azure.iot.kafka.connect.utils.EventHubOptionsProvider
 import com.typesafe.scalalogging.LazyLogging
 import org.apache.kafka.common.config.{ConfigDef, ConfigException}
 import org.apache.kafka.connect.connector.Task
@@ -19,7 +20,8 @@ import scala.collection.mutable
 
 class IotHubSourceConnector extends SourceConnector with LazyLogging with JsonSerialization {
 
-  private[this] var props: Map[String, String] = _
+  private[this] var props           : Map[String, String]     = _
+  private[this] var eventHubProvider: EventHubOptionsProvider = _
 
   override def taskClass(): Class[_ <: Task] = classOf[IotHubSourceTask]
 
@@ -81,23 +83,71 @@ class IotHubSourceConnector extends SourceConnector with LazyLogging with JsonSe
     }
 
     val iotHubSourceConfig = iotHubSourceConfigOption.get
+
+    val azkvUrl = iotHubSourceConfig.getString(IotHubSourceConfig.AzureKeyVaultUrl)
+    if (azkvUrl != null && !azkvUrl.isEmpty) {
+      eventHubProvider = new EventHubOptionsProvider(azkvUrl)
+    }
+    val eventHubEndpoint = new URI(getEventHubEndpoint(
+      iotHubSourceConfig.getString(IotHubSourceConfig.EventHubNamespaceSecret),
+      iotHubSourceConfig,
+      IotHubSourceConfig.EventHubCompatibleEndpoint
+    ))
+    val eventHubName = getFromKeyVaultOrConfig(
+      iotHubSourceConfig.getString(IotHubSourceConfig.EventHubNameSecret),
+      iotHubSourceConfig,
+      IotHubSourceConfig.EventHubCompatibleName
+    )
+    val eventHubAccessKeyName = getFromKeyVaultOrConfig(
+      iotHubSourceConfig.getString(IotHubSourceConfig.EventHubPolicynameSecret),
+      iotHubSourceConfig,
+      IotHubSourceConfig.IotHubAccessKeyName
+    )
+    val eventHubAccessKeyValue = getFromKeyVaultOrConfig(
+      iotHubSourceConfig.getString(IotHubSourceConfig.EventHubPolicykeySecret),
+      iotHubSourceConfig,
+      IotHubSourceConfig.IotHubAccessKeyValue
+    )
+    val eventHubConsumerGroup = getFromKeyVaultOrConfig(
+      iotHubSourceConfig.getString(IotHubSourceConfig.EventHubConsumergroupSecret),
+      iotHubSourceConfig,
+      IotHubSourceConfig.IotHubConsumerGroup
+    )
+
     val iotHubConnectionString = new ConnectionStringBuilder()
-      .setEndpoint(new URI(iotHubSourceConfig.getString(IotHubSourceConfig.EventHubCompatibleEndpoint)))
-      .setEventHubName(iotHubSourceConfig.getString(IotHubSourceConfig.EventHubCompatibleName))
-      .setSasKeyName(iotHubSourceConfig.getString(IotHubSourceConfig.IotHubAccessKeyName))
-      .setSasKey(iotHubSourceConfig.getString(IotHubSourceConfig.IotHubAccessKeyValue)).toString
+      .setEndpoint(eventHubEndpoint)
+      .setEventHubName(eventHubName)
+      .setSasKeyName(eventHubAccessKeyName)
+      .setSasKey(eventHubAccessKeyValue).toString
     this.props = Map[String, String](
       IotHubSourceConfig.EventHubCompatibleConnectionString -> iotHubConnectionString,
       IotHubSourceConfig.IotHubOffset -> iotHubSourceConfig.getString(IotHubSourceConfig.IotHubOffset),
       IotHubSourceConfig.BatchSize -> iotHubSourceConfig.getInt(IotHubSourceConfig.BatchSize).toString,
       IotHubSourceConfig.ReceiveTimeout -> iotHubSourceConfig.getInt(IotHubSourceConfig.ReceiveTimeout).toString,
       IotHubSourceConfig.KafkaTopic -> iotHubSourceConfig.getString(IotHubSourceConfig.KafkaTopic),
-      IotHubSourceConfig.IotHubConsumerGroup -> iotHubSourceConfig.getString(IotHubSourceConfig.IotHubConsumerGroup),
+      IotHubSourceConfig.IotHubConsumerGroup -> eventHubConsumerGroup,
       IotHubSourceConfig.IotHubPartitions -> iotHubSourceConfig.getInt(IotHubSourceConfig.IotHubPartitions).toString,
       IotHubSourceConfig.IotHubStartTime -> iotHubSourceConfig.getString(IotHubSourceConfig.IotHubStartTime),
-      IotHubSourceConfig.EventHubCompatibleName → iotHubSourceConfig.getString(IotHubSourceConfig.EventHubCompatibleName)
+      IotHubSourceConfig.EventHubCompatibleName → eventHubName
     )
   }
 
+  def getFromKeyVaultOrConfig(secret: String, config: IotHubSourceConfig, key: String): String = {
+    if (eventHubProvider != null) {
+      eventHubProvider.getCredential(secret)
+    } else {
+      config.getString(key)
+    }
+  }
+
+  def getEventHubEndpoint(secret: String, config: IotHubSourceConfig, key: String): String = {
+    if (eventHubProvider != null) {
+      s"sb://${eventHubProvider.getCredential(secret)}.servicebus.windows.net/"
+    } else {
+      config.getString(key)
+    }
+  }
+
   override def version(): String = getClass.getPackage.getImplementationVersion
+
 }

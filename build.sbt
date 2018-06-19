@@ -1,3 +1,4 @@
+import scala.collection.Seq
 // Copyright (c) Microsoft. All rights reserved.
 
 val iotHubKafkaConnectVersion = "0.7.0"
@@ -17,9 +18,13 @@ libraryDependencies ++= {
   val scalaLoggingVersion = "3.5.0"
   val logbackClassicVersion = "1.1.7"
   val scalaTestVersion = "3.0.0"
-  val configVersion = "1.3.1"
+  val configVersion = "1.3.2"
   val json4sVersion = "3.5.0"
   val iotHubServiceClientVersion = "1.4.22"
+  val azureVersion = "1.3.0"
+  val azureKeyVaultVersion = "1.0.0"
+  val azureKeyVaultProviderVersion = "1.0.1"
+  val hadoopVersion = "3.0.0"
 
   Seq(
     "org.apache.kafka" % "connect-api" % kafkaVersion % "provided",
@@ -30,11 +35,29 @@ libraryDependencies ++= {
     "com.typesafe.scala-logging" %% "scala-logging" % scalaLoggingVersion,
     "com.microsoft.azure.sdk.iot" % "iot-service-client" % iotHubServiceClientVersion,
 
+    // Azure Key Vault Dependencies
+    "com.microsoft.azure" % "azure-keyvault-core" % azureKeyVaultVersion % "provided",
+    "com.epam.honw" % "honw-key-vault-provider" % azureKeyVaultProviderVersion % "provided",
+    "org.apache.hadoop" % "hadoop-azure" % hadoopVersion % "provided"
+      exclude("com.microsoft.azure", "azure-storage")
+      exclude("javax.servlet", "servlet-api")
+      exclude("javax.servlet.jsp", "jsp-api")
+      exclude("org.mortbay.jetty", "servlet-api"),
+
     // Test dependencies
     "org.scalatest" %% "scalatest" % scalaTestVersion % "test",
-    "com.typesafe" % "config" % configVersion % "test"
+    "com.typesafe" % "config" % configVersion % "test",
+    "com.microsoft.azure" % "azure" % azureVersion % "test",
+    "com.microsoft.azure" % "azure-keyvault" % azureKeyVaultVersion % "test"
   )
 }
+
+resolvers in ThisBuild ++= Seq(
+  MavenRepository("Sonatype Nexus Repository Manager", "https://lca-dl-dev-artifactory.eastus2.cloudapp.azure.com/repository/honw_analytics_cluster_libs/"),
+  Resolver.mavenLocal
+)
+
+credentials += Credentials(Path.userHome / ".ivy2" / ".my-credentials")
 
 assemblyJarName in assembly := s"kafka-connect-iothub-assembly_2.11-$iotHubKafkaConnectVersion.jar"
 
